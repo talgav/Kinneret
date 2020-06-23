@@ -20,7 +20,7 @@ library(rgdal)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-library(remotes)
+#library(remotes)
 #install_github("mtennekes/tmaptools")
 #install_github("mtennekes/tmap")
 
@@ -72,6 +72,15 @@ return(mean_catch)
 
 
 
+
+
+
+```
+
+
+trail
+
+```{r eval=FALSE, include=FALSE}
 sample_adjecent_cells<-function(cell_id,buffer_dist=499,fish_data)  {
   
   cell<-which(fish_data$location == cell_id)
@@ -135,9 +144,9 @@ fishermen$location<-ifelse(fishermen$fishermen_id>3,
 
 #plot(grid_data["location"],reset = FALSE)
 #plot(inside,col="red",add=TRUE)
-
-
 ```
+
+
 
 3. plot the fish density and the fishermen location and the fish density
 
@@ -145,11 +154,11 @@ fishermen$location<-ifelse(fishermen$fishermen_id>3,
 ```{r}
 plot_fisher<-function(fish_data,fishermen_data){
   
- fisher_grid<-left_join(fishermen_data,fish_data,by="location")
-
+ fisher_grid<- left_join(fishermen_data,fish_data,by="location")
+ fisher_grid<- st_as_sf(fisher_grid)
  fishermen_map<-ggplot() + geom_sf(data = fish_data,aes(fill=fish_density_start))+
   geom_sf(data = fisher_grid,aes(colour = "red",fill = fish_density_start))+
-  geom_sf_label(data= fisher_grid,aes(label = fisher_grid$fishermen_id), label.padding = unit(0.1, "mm"))
+  geom_sf_label(data= fisher_grid,aes(label = fishermen_id), label.padding = unit(0.1, "mm"))
  
  return(fishermen_map)
   
@@ -160,7 +169,7 @@ plot_fisher<-function(fish_data,fishermen_data){
 upload the kinneret shapefile
 
 ```{r}
-Kinneret<-st_read("C:\\Users\\nimrodelk\\Documents\\PHD\\Kineret\\gis\\kinneret polygon self based on bing WGS 84.shp")
+Kinneret<-st_read("kinneret polygon self based on bing WGS 84.shp")
 
 ```
 
