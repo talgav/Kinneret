@@ -1,0 +1,232 @@
+---
+title: "1_kinnert test 1"
+author: "Tal Gavriely"
+date: "June 22, 2020"
+output: 
+   prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+##take the simple model from Kinneret test.Rmd and try to add some conditions
+
+
+```{r message=FALSE, warning=FALSE}
+library(sf)
+library(rgeos)
+library(raster)
+#install.packages('rgdal', type="source")
+library(rgdal)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(remotes)
+#install_github("mtennekes/tmaptools")
+#install_github("mtennekes/tmap")
+
+```
+
+
+functions:
+
+1. fishing function
+
+take the fish density and reduce it by the fishing efficiancey if there is a fishermen on the same spot
+
+*note: if the fishing efficiency is 0.7 from 100 fish, 70 will be the catch and 30 will stay in the water.
+
+
+```{r}
+fishing<-function(fish_data,fishermen_data,fishing_efficiency){
+  
+fish_data$fish_density_start[fish_data$location %in% fishermen$location]<-fish_data$fish_density[fish_data$location %in% fishermen$location ]*(1-fishing_efficiency) 
+
+return(fish_data)
+
+}
+
+```
+
+2. fishermen movement
+
+
+calculate the catch of each fishermen. if the catch is higher then the mean of all fishermen stay at the same place, if it lower choose new random location
+
+
+```{r}
+
+fisher_move<-function(fish_data,fishermen_data,fishing_efficiency){
+  
+fishermen_data$catch<-fish_data$fish_density_start[fishermen_data$location]*fishing_efficiency
+  
+mean_catch<-mean(fishermen_data$catch)
+
+fishermen_data$location<-ifelse(fishermen_data$catch>mean_catch,
+       fishermen_data$location,
+       sample(1:nrow(fish_data)))
+
+return(fishermen_data)
+return(mean_catch)
+
+}
+
+
+
+sample_adjecent_cells<-function(cell_id,buffer_dist=499,fish_data)  {
+  
+  cell<-which(fish_data$location == cell_id)
+  
+  buffer<-st_buffer(fish_data[cell,1],buffer_dist)
+  
+  buffer$location<-NULL
+  
+  inside<- st_intersection(buffer, fish_data)
+  
+  choose_from_here<-which(fish_data$location %in% inside$location)
+  
+  choose_from_here<-as.numeric(choose_from_here)
+  
+  new_location<- sample(choose_from_here,1,replace = F)
+  
+  return(new_location)
+  
+}
+
+fisher_move<-function(fish_data,fishermen_data,fishing_efficiency){
+  
+fishermen_data$catch<-fish_data$fish_density_start[fishermen_data$location]*fishing_efficiency
+  
+mean_catch<-mean(fishermen_data$catch)
+
+fishermen_data$location<-ifelse(fishermen_data$catch>mean_catch,
+       sample_adjecent_cells(cell_id = fishermen_data$location,buffer_dist =  499,fish_data= fish_data),
+       sample(1:nrow(fish_data)))
+
+return(fishermen_data)
+
+
+}
+
+
+sample_adjecent_cells(fishermen$location[1],499,fish_data = grid_data)
+
+
+adjecent_cells(fishermen_location = fishermen$location)
+
+fishermen$location<-ifelse(fishermen$fishermen_id>3,
+                           sample_adjecent_cells(cell_id = fishermen$location,
+                                                 buffer_dist = 499,
+                                                 fish_data = grid_data),
+                           sample(1:100)
+                           )
+
+
+#cell<-which(grid_data$location==fishermen$location[3])
+
+#buff<-st_buffer(grid_data[cell,1], dist = 499)
+#buff$location<-NULL
+
+#plot(grid_data["location"],reset = FALSE)
+#plot(buff, col = "red",add=TRUE)
+
+#inside<-st_intersection(buff, grid_data)
+
+
+
+#plot(grid_data["location"],reset = FALSE)
+#plot(inside,col="red",add=TRUE)
+
+
+```
+
+3. plot the fish density and the fishermen location and the fish density
+
+
+```{r}
+plot_fisher<-function(fish_data,fishermen_data){
+  
+ fisher_grid<-left_join(fishermen_data,fish_data,by="location")
+
+ fishermen_map<-ggplot() + geom_sf(data = fish_data,aes(fill=fish_density_start))+
+  geom_sf(data = fisher_grid,aes(colour = "red",fill = fish_density_start))+
+  geom_sf_label(data= fisher_grid,aes(label = fisher_grid$fishermen_id), label.padding = unit(0.1, "mm"))
+ 
+ return(fishermen_map)
+  
+  
+}
+```
+
+upload the kinneret shapefile
+
+```{r}
+Kinneret<-st_read("C:\\Users\\nimrodelk\\Documents\\PHD\\Kineret\\gis\\kinneret polygon self based on bing WGS 84.shp")
+
+```
+
+Create a grid (ploygon) in the shape of kinneret lake 
+
+```{r}
+grid_1 <- Kinneret %>% 
+  st_make_grid(cellsize = 500) %>% # grid of 500m on 500m
+  st_intersection(Kinneret) # cut it to the shape of the kinneret poligon
+
+
+```
+
+
+add to the polygon grid data of cell Id and fish density
+
+```{r}
+
+data<-data.frame("location" =1:length(grid_1),fish_density_start=seq(1:729))
+
+grid_data<- st_sf(data, geometry = grid_1) 
+
+
+```
+
+
+
+set the fishermen data
+
+```{r}
+
+fishermen<-data.frame("fishermen_id"=1:50)
+fishermen$location<-sample(1:nrow(grid_data),nrow(fishermen),replace = F)
+fishermen$catch<-rep(0)
+
+plot_fisher(grid_data,fishermen)
+
+```
+
+
+```{r}
+
+
+time_steps <- 30
+ts <- 0
+number<-1
+plot_list<-list()
+
+while(ts < time_steps){
+    grid_data <- fishing(fish_data =  grid_data,fishermen_data =  fishermen,fishing_efficiency =  0.3);
+    fishermen<-fisher_move(fish_data = grid_data,fishermen_data = fishermen,fishing_efficiency =  0.3);
+    plot_list[[number]]<-plot_fisher(grid_data,fishermen);
+    ts   <- ts + 1
+    number<-number+1
+}
+ 
+plot_list[[1]] 
+plot_list[[2]]
+plot_list[[3]]
+plot_list[[4]]
+plot_list[[5]] 
+plot_list[[6]]
+plot_list[[7]]
+plot_list[[8]]
+plot_list[[9]] 
+plot_list[[10]]
+
+
+```
