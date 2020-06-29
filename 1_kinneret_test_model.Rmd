@@ -81,6 +81,8 @@ return(mean_catch)
 trail
 
 ```{r eval=FALSE, include=FALSE}
+
+
 sample_adjecent_cells<-function(cell_id,buffer_dist=499,fish_data)  {
   
   cell<-which(fish_data$location == cell_id)
